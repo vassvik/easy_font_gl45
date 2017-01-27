@@ -131,8 +131,6 @@ int main()
     Color fgColor = {248/255.0, 248/255.0, 242/225.0};
     Color bgColor = {68/255.0, 71/255.0, 90/225.0};
 
-    
-
     while ( !glfwWindowShouldClose(window)) { 
         // calculate fps
         double t2 = glfwGetTime();
@@ -365,11 +363,11 @@ void font_setup_texture(Font *font)
 void font_setup_text(Font *font)
 {
     glCreateBuffers(1, &font->vbo_code_instances);
-    glNamedBufferData(font->vbo_code_instances, 4*3*MAX_STRING_LEN, NULL, GL_DYNAMIC_DRAW);
+    glNamedBufferData(font->vbo_code_instances, 4*4*MAX_STRING_LEN, NULL, GL_DYNAMIC_DRAW);
     
     glEnableVertexArrayAttrib(font->vao, 1);
-    glVertexArrayVertexBuffer(font->vao, 1, font->vbo_code_instances, 0, 3*sizeof(float));
-    glVertexArrayAttribFormat(font->vao, 1, 3, GL_FLOAT, GL_FALSE, 0);
+    glVertexArrayVertexBuffer(font->vao, 1, font->vbo_code_instances, 0, 4*sizeof(float));
+    glVertexArrayAttribFormat(font->vao, 1, 4, GL_FLOAT, GL_FALSE, 0);
     glVertexArrayBindingDivisor(font->vao, 1, 1);
 
     glUseProgram(program_text);
@@ -389,7 +387,7 @@ void font_update_text(Font *font)
         return;
     }
 
-    static float text_glyph_data[3*MAX_STRING_LEN];
+    static float text_glyph_data[4*MAX_STRING_LEN];
 
     float X = 0.0;
     float Y = 0.0;
@@ -417,17 +415,18 @@ void font_update_text(Font *font)
         float x1 = X;
         float y1 = Y;
 
-        int ctr1 = 3*ctr;
+        int ctr1 = 4*ctr;
         text_glyph_data[ctr1++] = x1;
         text_glyph_data[ctr1++] = y1;
         text_glyph_data[ctr1++] = code_base;
+        text_glyph_data[ctr1++] = 0.0;
 
         X += width;
         ctr++;
     }
 
     // actual uploading
-    glNamedBufferSubData(font->vbo_code_instances, 0, 4*3*ctr, text_glyph_data);
+    glNamedBufferSubData(font->vbo_code_instances, 0, 4*4*ctr, text_glyph_data);
 
     font->ctr = ctr;
 }
