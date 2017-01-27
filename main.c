@@ -43,11 +43,24 @@ void mousepos_callback(GLFWwindow* win, double xpos, double ypos);
 void mousewheel_callback(GLFWwindow* win, double xoffset, double yoffset);
 void windowsize_callback(GLFWwindow *win, int width, int height);
 
+#define MAX_STRING_LEN 40000
 
 /*
     The font stores all the glyphs sequentially, 
     so the texture is "size of font" high, and
     sum(glyph_widths) wide
+
+    one string can hold up to MAX_STRING_LEN chars, which is hard coded to 40k...
+    there's really no need to have multiple vbos for multiple strings, because
+    it's so damn fast anyway. 40k is the max used storage, buy usually you'll just
+    use the first 100 or so chars
+
+    uses instancing, so that the only thing that need to be updated is the
+    position of each glyph in the string (relative to the lower left corner)
+    and its index for lookup in the metadata texture
+
+    the metadata texture values are then used to look up in the bitmap texture
+
 */
 typedef struct Font {
     // font info and data
@@ -72,28 +85,12 @@ typedef struct Font {
     // 1D texture for glyph metadata, RGBA: (glyph_offset_x, glyph_offset_y, glyph_width, glyph_height)
     // normalized (since it's a texture)
     GLuint texture_metadata;
-} Font;
 
-
-#define MAX_STRING_LEN 40000
-
-/*
-    one string can hold up to MAX_STRING_LEN chars, which is hard coded to 40k...
-    there's really no need to have multiple vbos for multiple strings, because
-    it's so damn fast anyway. 40k is the max used storage, buy usually you'll just
-    use the first 100 or so chars
-
-    uses instancing, so that the only thing that need to be updated is the
-    position of each glyph in the string (relative to the lower left corner)
-    and its index for lookup in the metadata texture
-
-    the metadata texture values are then used to look up in the bitmap texture
-*/
-typedef struct Font_String {
     GLuint vbo_code_instances;  // vec3: (char_pos_x, char_pos_y, char_index)
     char str[MAX_STRING_LEN];   // persistent storage of string
-    int ctr;                    // size
-} Font_String;
+    int ctr;                    // the number of glyphs to draw (i.e. the length of the string minus newlines)
+} Font;
+
 
 typedef struct vec2 {
     float x, y;
@@ -109,9 +106,9 @@ void font_print_string(char *str, Font *font);
 void font_read(char *filename, Font *font);
 void font_clean(Font *font);
 void font_setup_texture(Font *font);
-void font_setup_text(Font *font, Font_String *font_string);
-void font_update_text(Font *font, Font_String *font_string);
-void font_draw(Font *font, Font_String *font_string, vec2 offset, Color bgColor, Color fgColor, float size);
+void font_setup_text(Font *font);
+void font_update_text(Font *font);
+void font_draw(Font *font, vec2 offset, Color bgColor, Color fgColor, float size);
 
 GLuint program_text;
 
@@ -125,8 +122,7 @@ int main()
     font_read("easy_font_raw.png", &font);
     font_print_string("wi asd abd i w", &font); // for testing if texture is loaded correctly
 
-    Font_String font_string = {0};
-    font_setup_text(&font, &font_string);
+    font_setup_text(&font);
 
     double t1 = glfwGetTime();
     double avg_dt = 1.0/60;
@@ -148,9 +144,9 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         vec2 offset = {-1.0 + 4.0*1.0/resx, 1.0 - 4.0*12.0/resy};
-        sprintf(font_string.str, "fps = %.3f\n", 1.0/avg_dt);
-        font_update_text(&font, &font_string);
-        font_draw(&font, &font_string, offset, bgColor, fgColor, 2.0);
+        sprintf(font.str, "fps = %.3f\n", 1.0/avg_dt);
+        font_update_text(&font);
+        font_draw(&font, offset, bgColor, fgColor, 2.0);
 
         char str[128];
         sprintf(str, "fps = %f\n", 1.0/avg_dt);
@@ -366,13 +362,13 @@ void font_setup_texture(Font *font)
     Creates the vbo used for updating and drawing text. 
     Initially has a max length of MAX_STRING_LEN, but you're not obliged to use all of it
 */
-void font_setup_text(Font *font, Font_String *font_string)
+void font_setup_text(Font *font)
 {
-    glCreateBuffers(1, &font_string->vbo_code_instances);
-    glNamedBufferData(font_string->vbo_code_instances, 4*3*MAX_STRING_LEN, NULL, GL_DYNAMIC_DRAW);
+    glCreateBuffers(1, &font->vbo_code_instances);
+    glNamedBufferData(font->vbo_code_instances, 4*3*MAX_STRING_LEN, NULL, GL_DYNAMIC_DRAW);
     
     glEnableVertexArrayAttrib(font->vao, 1);
-    glVertexArrayVertexBuffer(font->vao, 1, font_string->vbo_code_instances, 0, 3*sizeof(float));
+    glVertexArrayVertexBuffer(font->vao, 1, font->vbo_code_instances, 0, 3*sizeof(float));
     glVertexArrayAttribFormat(font->vao, 1, 3, GL_FLOAT, GL_FALSE, 0);
     glVertexArrayBindingDivisor(font->vao, 1, 1);
 
@@ -386,9 +382,9 @@ void font_setup_text(Font *font, Font_String *font_string)
 
     Supports newlines
 */
-void font_update_text(Font *font, Font_String *font_string)
+void font_update_text(Font *font)
 {
-    if (font_string->ctr > MAX_STRING_LEN) {
+    if (font->ctr > MAX_STRING_LEN) {
         printf("Error: string too long. Returning\n");
         return;
     }
@@ -405,16 +401,16 @@ void font_update_text(Font *font, Font_String *font_string)
     int *glyph_offsets = font->glyph_offsets;
     int *glyph_widths = font->glyph_widths;
 
-    int len = strlen(font_string->str);
+    int len = strlen(font->str);
     for (int i = 0; i < len; i++) {
 
-        if (font_string->str[i] == '\n') {
+        if (font->str[i] == '\n') {
             X = 0.0;
             Y -= height;
             continue;
         }
 
-        int code_base = font_string->str[i]-32; // first glyph is ' ', i.e. ascii code 32
+        int code_base = font->str[i]-32; // first glyph is ' ', i.e. ascii code 32
         float offset = glyph_offsets[code_base];
         float width = glyph_widths[code_base];
 
@@ -431,12 +427,12 @@ void font_update_text(Font *font, Font_String *font_string)
     }
 
     // actual uploading
-    glNamedBufferSubData(font_string->vbo_code_instances, 0, 4*3*ctr, text_glyph_data);
+    glNamedBufferSubData(font->vbo_code_instances, 0, 4*3*ctr, text_glyph_data);
 
-    font_string->ctr = ctr;
+    font->ctr = ctr;
 }
 
-void font_draw(Font *font, Font_String *font_string, vec2 offset, Color bgColor, Color fgColor, float size) 
+void font_draw(Font *font, vec2 offset, Color bgColor, Color fgColor, float size) 
 {
     glUseProgram(program_text);
 
@@ -451,7 +447,7 @@ void font_draw(Font *font, Font_String *font_string, vec2 offset, Color bgColor,
     glBindTextureUnit(0, font->texture_fontdata);
     glBindTextureUnit(1, font->texture_metadata);
 
-    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, font_string->ctr);
+    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, font->ctr);
 }
 
 
@@ -502,7 +498,6 @@ void init_GL()
 // Adjusts the viewport
 // Resets shader uniform containing resolution
 void windowsize_callback(GLFWwindow* win, int width, int height) {
-
     (void)win;
 
     resx = width;
