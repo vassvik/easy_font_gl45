@@ -419,7 +419,7 @@ void font_update_text(Font *font)
         text_glyph_data[ctr1++] = x1;
         text_glyph_data[ctr1++] = y1;
         text_glyph_data[ctr1++] = code_base;
-        text_glyph_data[ctr1++] = 0.0;
+        text_glyph_data[ctr1++] = i % 6;
 
         X += width;
         ctr++;

@@ -12,6 +12,7 @@ layout(binding = 1) uniform sampler1D sampler_meta;
 uniform vec2 resolution;
 
 out vec2 uv;
+out float color_index;
 
 void main(){
     float res_meta = textureSize(sampler_meta, 0);
@@ -37,6 +38,7 @@ void main(){
 
     // send the correct uv's in the font atlas to the fragment shader
     uv = glyph_pos + vertexPosition*res_glyph;
+    color_index = instanceGlyph.w;
 
     gl_Position = vec4(p, 0.0, 1.0);
 }
