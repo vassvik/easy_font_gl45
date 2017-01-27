@@ -141,16 +141,31 @@ int main()
         glfwPollEvents();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        vec2 offset = {-1.0 + 4.0*1.0/resx, 1.0 - 4.0*12.0/resy};
-        sprintf(font.str, "fps = %.3f\n", 1.0/avg_dt);
-        font_update_text(&font);
-        font_draw(&font, offset, bgColor, fgColor, 2.0);
+        {
+            vec2 offset = {-1.0 + 4.0*1.0/resx, 1.0 - 4.0*12.0/resy};
+            sprintf(font.str, "fps = %.3f\n\0", 1.0/avg_dt);
+            font_update_text(&font);
+            //glFinish();
+            font_draw(&font, offset, bgColor, fgColor, 2.0);
+            glFinish();
+        }
+        {
+            vec2 offset = {-1.0 + 4.0*1.0/resx, 1.0 - 4.0*32.0/resy};
+            sprintf(font.str, "void mainImage( out vec4 fragColor, in vec2 fragCoord )\n{\n    vec2 uv = fragCoord.xy / iResolution.xy;\n    fragColor = vec4(uv,0.5+0.5*sin(iGlobalTime), 1.0);\n}\n");
+            sprintf(font.str, "asdas dasd fps = %.3f\n\0", 1.0/avg_dt);
+
+            font_update_text(&font);
+            //glFinish();
+            font_draw(&font, offset, bgColor, fgColor, 2.0);
+            glFinish();
+        }
+        // glFinish();
+
+        glfwSwapBuffers(window);
 
         char str[128];
         sprintf(str, "fps = %f\n", 1.0/avg_dt);
         glfwSetWindowTitle(window, str);
-
-        glfwSwapBuffers(window);
     }
 
     glfwTerminate();
@@ -356,6 +371,9 @@ void font_setup_texture(Font *font)
     free(texture_metadata);
 }
 
+
+float *text_glyph_data;
+
 /*
     Creates the vbo used for updating and drawing text. 
     Initially has a max length of MAX_STRING_LEN, but you're not obliged to use all of it
@@ -363,7 +381,10 @@ void font_setup_texture(Font *font)
 void font_setup_text(Font *font)
 {
     glCreateBuffers(1, &font->vbo_code_instances);
-    glNamedBufferData(font->vbo_code_instances, 4*4*MAX_STRING_LEN, NULL, GL_DYNAMIC_DRAW);
+    glNamedBufferStorage(font->vbo_code_instances, 4*4*MAX_STRING_LEN, NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT);
+    text_glyph_data = glMapNamedBufferRange(font->vbo_code_instances, 0, 4*4*MAX_STRING_LEN, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+
+    //glNamedBufferData(font->vbo_code_instances, 4*4*MAX_STRING_LEN, NULL, GL_DYNAMIC_DRAW);
     
     glEnableVertexArrayAttrib(font->vao, 1);
     glVertexArrayVertexBuffer(font->vao, 1, font->vbo_code_instances, 0, 4*sizeof(float));
@@ -373,6 +394,22 @@ void font_setup_text(Font *font)
     glUseProgram(program_text);
     glUniform2f(glGetUniformLocation(program_text, "resolution"), resx, resy);
 }
+
+
+
+typedef enum Token_Type {TOKEN_OTHER=0, TOKEN_OPERATOR, TOKEN_NUMERIC, TOKEN_FUNCTION, TOKEN_KEYWORD, TOKEN_COMMENT, TOKEN_TYPE, TOKEN_UNSET} Token_Type;
+
+const char *TOKEN_NAMES[] = {"other", "operator", "numeric", "function", "keyword", "comment", "type", "unset"};
+
+const char *TYPES[] = {"void", "int", "float", "vec2", "vec3", "vec4", "sampler1D", "sampler2D"};
+const char *KEYWORDS[] = {"#version", "#define", "in", "out", "uniform", "layout", "return", "if", "else", "for", "while"};
+
+typedef struct Token 
+{
+    char *start;
+    char *stop;
+    Token_Type type;
+} Token;
 
 /*
     Parses a string (in font_string.str) and creates position and index data sent to 
@@ -385,9 +422,216 @@ void font_update_text(Font *font)
     if (font->ctr > MAX_STRING_LEN) {
         printf("Error: string too long. Returning\n");
         return;
+    } 
+    
+
+    float str_colors[MAX_STRING_LEN] = {0};
+
+    // ignored characters
+    char delims[] = " ,(){};\t\n";
+    int num_delims = strlen(delims);
+
+    char operators[] = "/+-*<>=&|";
+    int num_operators = strlen(operators);
+
+    Token tokens[9999]; // hurr
+    int num_tokens = 0; // running counter
+
+
+    char *ptr = font->str;
+    while (*ptr) {
+        // skip delimiters
+        int is_delim = 0;
+        for (int i = 0; i < num_delims; i++) {
+            if (*ptr == delims[i]) {
+                is_delim = 1;
+                break;
+            }
+        }
+
+        if (is_delim == 1) {
+            ptr++;
+            continue;
+        }
+
+
+        // found a token!
+        char *start = ptr;
+
+        if (*ptr == '/' && *(ptr+1) == '/') {
+            // found a line comment, go to end of line or end of file
+            while (*ptr != '\n' && *ptr != '\0') {
+                ptr++;
+            }
+
+            tokens[num_tokens].start = start;
+            tokens[num_tokens].stop = ptr;
+            tokens[num_tokens].type = TOKEN_COMMENT;
+            num_tokens++;
+
+            ptr++;
+            continue;
+        }
+
+        if (*ptr == '/' && *(ptr+1) == '*') {
+            // found a block comment, go to end of line or end of file
+            while (!(*ptr == '*' && *(ptr+1) == '/') && *ptr != '\0') {
+                ptr++;
+            }
+            ptr++;
+
+            tokens[num_tokens].start = start;
+            tokens[num_tokens].stop = ptr+1;
+            tokens[num_tokens].type = TOKEN_COMMENT;
+            num_tokens++;
+
+            ptr++;
+            continue;
+        } 
+
+        // check if it's an operator
+        int is_operator = 0;
+        for (int i = 0; i < num_operators; i++) {
+            if (*ptr == operators[i]) {
+                is_operator = 1;
+                break;
+            }
+        }
+
+        if (is_operator == 1) {
+            tokens[num_tokens].start = start;
+            tokens[num_tokens].stop = ptr+1;
+            tokens[num_tokens].type = TOKEN_OPERATOR;
+            num_tokens++;
+            ptr++;
+            continue;
+        } 
+
+        // it's either a name, type, a keyword, a function, or an names separated by an operator without spaces
+        while (*ptr) {
+            // check whether it's an operator stuck between two names
+            int is_operator2 = 0;
+            for (int i = 0; i < num_operators; i++) {
+                if (*ptr == operators[i]) {
+                    is_operator2 = 1;
+                    break;
+                }
+            }
+
+            if (is_operator2 == 1) {
+                tokens[num_tokens].start = start;
+                tokens[num_tokens].stop = ptr;
+                tokens[num_tokens].type = TOKEN_UNSET;
+                num_tokens++;
+                break;
+            }
+
+            // otherwise go until we find the next delimiter
+            int is_delim2 = 0;
+            for (int i = 0; i < num_delims; i++) {
+                if (*ptr == delims[i]) {
+                    is_delim2 = 1;
+                    break;
+                }
+            }
+
+            if (is_delim2 == 1) {
+                tokens[num_tokens].start = start;
+                tokens[num_tokens].stop = ptr;
+                tokens[num_tokens].type = TOKEN_UNSET;
+                num_tokens++;
+                ptr++;
+                break;
+            } 
+
+            // did not find delimiter, check next char
+            ptr++; 
+        }
     }
 
-    static float text_glyph_data[4*MAX_STRING_LEN];
+    // determine the types of the unset tokens, i.e. either
+    // a name, a type, a keyword, or a function
+    int num_keywords = sizeof(KEYWORDS)/sizeof(char*);
+    int num_types = sizeof(TYPES)/sizeof(char*);
+    // printf("num_keywords = %d\n", num_keywords);
+    // printf("num_types = %d\n", num_types);
+
+    for (int i = 0; i < num_tokens; i++) {
+        // TOKEN_OPERATOR and TOKEN_COMMENT should already be set, so skip those
+        if (tokens[i].type != TOKEN_UNSET) {
+            continue;
+        }
+
+        char end_char = *tokens[i].stop;
+
+        // temporarily null terminate at end of token, restored after parsing
+        *tokens[i].stop = '\0';
+
+        // parse
+        
+        // Check if it's a function
+        float f;
+        if (end_char == '(') {
+            tokens[i].type = TOKEN_FUNCTION;
+            *tokens[i].stop = end_char;
+            continue;
+        } 
+
+        // or if it's a numeric value. catches both integers and floats
+        if (sscanf(tokens[i].start, "%f", &f) == 1) {
+            tokens[i].type = TOKEN_NUMERIC;
+            *tokens[i].stop = end_char;
+            continue;
+        } 
+
+        // if it's a keyword
+        int is_keyword = 0;
+        for (int j = 0; j < num_keywords; j++) {
+            if (strcmp(tokens[i].start, KEYWORDS[j]) == 0) {
+                is_keyword = 1;
+                break;
+            }
+        }
+        if (is_keyword == 1) {
+            tokens[i].type = TOKEN_KEYWORD;
+            *tokens[i].stop = end_char;
+            continue;
+        } 
+
+        // if it's a variable type
+        int is_type = 0;
+        for (int j = 0; j < num_types; j++) {
+            if (strcmp(tokens[i].start, TYPES[j]) == 0) {
+                is_type = 1;
+                break;
+            }
+        }
+        if (is_type == 1) {
+            tokens[i].type = TOKEN_TYPE;
+            *tokens[i].stop = end_char;
+            continue;
+        } 
+
+        // otherwise it's a regular variable name 
+        tokens[i].type = TOKEN_OTHER;
+        *tokens[i].stop = end_char;
+    }
+    
+    // print all tokens and their types
+    for (int i = 0; i < num_tokens; i++) {
+        /*
+        printf("token[%3d]: type: %-9s string: \"", i, TOKEN_NAMES[tokens[i].type]);
+        for (char *p = tokens[i].start; p != tokens[i].stop; p++)
+            printf("%c", *p);
+        printf("\"\n");
+        */
+        for (char *p = tokens[i].start; p != tokens[i].stop; p++) {
+            str_colors[(p - font->str)] = tokens[i].type;
+            
+        }
+    }
+
+
 
     float X = 0.0;
     float Y = 0.0;
@@ -408,6 +652,8 @@ void font_update_text(Font *font)
             continue;
         }
 
+        // printf("%c\n", font->str[i]);
+
         int code_base = font->str[i]-32; // first glyph is ' ', i.e. ascii code 32
         float offset = glyph_offsets[code_base];
         float width = glyph_widths[code_base];
@@ -420,20 +666,22 @@ void font_update_text(Font *font)
         text_glyph_data[ctr1++] = y1;
         text_glyph_data[ctr1++] = code_base;
         // text_glyph_data[ctr1++] = i % 6;
-        text_glyph_data[ctr1++] = 0.0;
+        //text_glyph_data[ctr1++] = 0.0;
+        text_glyph_data[ctr1++] = str_colors[i];
 
         X += width;
         ctr++;
     }
 
     // actual uploading
-    glNamedBufferSubData(font->vbo_code_instances, 0, 4*4*ctr, text_glyph_data);
-
+    // glNamedBufferSubData(font->vbo_code_instances, 0, 4*4*ctr, text_glyph_data);
+    // printf("%d: %s\n", ctr, font->str);
     font->ctr = ctr;
 }
 
 void font_draw(Font *font, vec2 offset, Color bgColor, Color fgColor, float size) 
 {
+    // printf("%d: %s\n", font->ctr, font->str);
     glUseProgram(program_text);
 
     glUniform1f(glGetUniformLocation(program_text, "time"), glfwGetTime());
