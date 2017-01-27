@@ -1,4 +1,4 @@
-#version 330 core
+#version 450 core
 
 layout(location = 0) in vec2 vertexPosition;
 layout(location = 1) in vec3 instanceGlyph;
@@ -6,8 +6,8 @@ layout(location = 1) in vec3 instanceGlyph;
 uniform vec2 string_offset;
 uniform vec2 string_size;
 
-uniform sampler2D sampler_font;
-uniform sampler1D sampler_meta;
+layout(binding = 0) uniform sampler2D sampler_font;
+layout(binding = 1) uniform sampler1D sampler_meta;
 
 uniform vec2 resolution;
 

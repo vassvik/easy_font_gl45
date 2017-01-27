@@ -1,13 +1,17 @@
 #include <stdlib.h>
 
 #define STB_IMAGE_IMPLEMENTATION
-#define STBI_ONLY_PNG
+#define STBI_ONLY_PNG // for loading "easy_font_raw.png"
 #include "stb_image.h"
 
 #define GLEW_STATIC
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+/*
+    Uniform random numbers between 0.0 (inclusive) and 1.0 (exclusive)
+    Lehmer RNG, "minimal standard"
+*/
 double rng()
 {
     static unsigned int seed = 123;
@@ -16,53 +20,79 @@ double rng()
 }
 
 GLFWwindow *window;
-double resx = 1900;
-double resy = 1000;
+double resx = 900;
+double resy = 600;
 
-double prevx, prevy;
-int clickedButtons = 0;
+double prevx, prevy;    // for mouse position
+int clickedButtons = 0; // bit field for mouse clicks
 
 enum buttonMaps { FIRST_BUTTON=1, SECOND_BUTTON=2, THIRD_BUTTON=4, FOURTH_BUTTON=8, FIFTH_BUTTON=16, NO_BUTTON=0 };
 enum modifierMaps { CTRL=2, SHIFT=1, ALT=4, META=8, NO_MODIFIER=0 };
 
+// all glfw and opengl init here
 void init_GL();
+
+// utility functions to load shaders
 char *readFile(const char *filename);
 GLuint LoadShaders(const char * vertex_file_path,const char * fragment_file_path);
 
+// callback functions to send to glfw
 void key_callback(GLFWwindow* win, int key, int scancode, int action, int mods);
 void mousebutton_callback(GLFWwindow* win, int button, int action, int mods);
 void mousepos_callback(GLFWwindow* win, double xpos, double ypos);
 void mousewheel_callback(GLFWwindow* win, double xoffset, double yoffset);
 void windowsize_callback(GLFWwindow *win, int width, int height);
 
-#define MAX_STRING_LEN 50000
 
+/*
+    The font stores all the glyphs sequentially, 
+    so the texture is "size of font" high, and
+    sum(glyph_widths) wide
+*/
 typedef struct Font {
-    int height;
-    int width;
-    int width_padded;
-    unsigned char *font_bitmap;
+    // font info and data
+    int height;                 // font height (with padding), 10 px for easy_font_raw.png
+    int width;                  // width of texture
+    int width_padded;           // opengl wants textures that are multiple of 4 wide
+    unsigned char *font_bitmap; // RGB
     
-    int num_glyphs;
-    int *glyph_widths;
-    int *glyph_offsets;
+    int num_glyphs;     // 96 glyphs for easy_font_raw.png
+    int *glyph_widths;  // variable width of each glyph
+    int *glyph_offsets; // starting point of each glyph
 
-    GLuint vao_ID;
-    GLuint vbo_pos;
-    GLuint vbo_uvs;
+    // opengl stuff
+    GLuint vao; 
     
+    // vbo used for glyph instancing, it's just [0,1]x[0,1]
     GLuint vbo_glyph_pos_instance;
     
+    // 2D texture for bitmap data
     GLuint texture_fontdata;
+
+    // 1D texture for glyph metadata, RGBA: (glyph_offset_x, glyph_offset_y, glyph_width, glyph_height)
+    // normalized (since it's a texture)
     GLuint texture_metadata;
 } Font;
 
-typedef struct Font_String {
-    GLuint vbo_code_instances;
 
-    char str[MAX_STRING_LEN];
-    int caret;
-    int ctr;
+#define MAX_STRING_LEN 40000
+
+/*
+    one string can hold up to MAX_STRING_LEN chars, which is hard coded to 40k...
+    there's really no need to have multiple vbos for multiple strings, because
+    it's so damn fast anyway. 40k is the max used storage, buy usually you'll just
+    use the first 100 or so chars
+
+    uses instancing, so that the only thing that need to be updated is the
+    position of each glyph in the string (relative to the lower left corner)
+    and its index for lookup in the metadata texture
+
+    the metadata texture values are then used to look up in the bitmap texture
+*/
+typedef struct Font_String {
+    GLuint vbo_code_instances;  // vec3: (char_pos_x, char_pos_y, char_index)
+    char str[MAX_STRING_LEN];   // persistent storage of string
+    int ctr;                    // size
 } Font_String;
 
 typedef struct vec2 {
@@ -73,12 +103,13 @@ typedef struct Color {
     float R, G, B;
 } Color;
 
+// console printing, for debugging purposes
 void font_print_string(char *str, Font *font);
 
 void font_read(char *filename, Font *font);
 void font_clean(Font *font);
 void font_setup_texture(Font *font);
-void font_setup_text(Font_String *font_string);
+void font_setup_text(Font *font, Font_String *font_string);
 void font_update_text(Font *font, Font_String *font_string);
 void font_draw(Font *font, Font_String *font_string, vec2 offset, Color bgColor, Color fgColor, float size);
 
@@ -95,7 +126,7 @@ int main()
     font_print_string("wi asd abd i w", &font); // for testing if texture is loaded correctly
 
     Font_String font_string = {0};
-    font_setup_text(&font_string);
+    font_setup_text(&font, &font_string);
 
     double t1 = glfwGetTime();
     double avg_dt = 1.0/60;
@@ -104,10 +135,7 @@ int main()
     Color fgColor = {248/255.0, 248/255.0, 242/225.0};
     Color bgColor = {68/255.0, 71/255.0, 90/225.0};
 
-    vec2 offset_left = {-0.995, 0.95};
-    vec2 offset_right = {-0.1, 0.95};
-
-    sprintf(font_string.str, "asdasdasd asdasd\n");
+    vec2 offset = {-0.995, 0.91};
 
     while ( !glfwWindowShouldClose(window)) { 
         // calculate fps
@@ -118,8 +146,10 @@ int main()
 
         glfwPollEvents();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
+        sprintf(font_string.str, "fps = %.3f\n", 1.0/avg_dt);
         font_update_text(&font, &font_string);
-        font_draw(&font, &font_string, offset_left, bgColor, fgColor, 2.0);
+        font_draw(&font, &font_string, offset, bgColor, fgColor, 2.0);
 
         char str[128];
         sprintf(str, "fps = %f\n", 1.0/avg_dt);
@@ -175,7 +205,9 @@ void font_print_string(char *str, Font *font)
 }
 
 /*
-
+    Reads easy_font_raw.png and extracts the font info
+    i.e. offset and width of each glyph, by parsing the first row 
+    containing black dots
 */
 void font_read(char *filename, Font *font)
 {
@@ -261,96 +293,105 @@ void font_clean(Font *font)
 }
 
 
+/*
+    Initialize opengl stuff in the font struct, based on the data read from the file
 
+    Creates one grayscale 2D texture containing the font bitmap data (as in the .png file)
+    and one RGBA32F 1D texture containing font metadata, i.e. for some ascii code, where
+    does it have to go to find that glyph in the 2D texture, and how much should it get
+*/
 void font_setup_texture(Font *font)
 {
-    float vertex_pos_data[] = {
-        -1.0, -1.0, 0.0,
-         1.0, -1.0, 0.0,
-        -1.0,  1.0, 0.0,
-        -1.0,  1.0, 0.0,
-         1.0, -1.0, 0.0,
-         1.0,  1.0, 0.0
-    };
-
-    float x = font->width/(double)font->width_padded;
-
-    float vertex_uv_data[] = {
-        0.0, 0.0,
-        x,   0.0,
-        0.0, 1.0,
-        0.0, 1.0,
-        x,   0.0,
-        x,   1.0
-    };
-
-
-    glGenVertexArrays(1, &font->vao_ID);
-    glBindVertexArray(font->vao_ID);
-
-    glGenBuffers(1, &font->vbo_pos);
-    glBindBuffer(GL_ARRAY_BUFFER, font->vbo_pos);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_pos_data), vertex_pos_data, GL_STATIC_DRAW);
-
-    glGenBuffers(1, &font->vbo_uvs);
-    glBindBuffer(GL_ARRAY_BUFFER, font->vbo_uvs);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_uv_data), vertex_uv_data, GL_STATIC_DRAW);
-
-
-    glGenTextures(1, &font->texture_fontdata);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, font->texture_fontdata);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, font->width_padded, font->height, 0, GL_RED, GL_UNSIGNED_BYTE, font->font_bitmap);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-
-
+    //-------------------------------------------------------------------------
+    glGenVertexArrays(1, &font->vao);
+    glBindVertexArray(font->vao);
+    
+    //-------------------------------------------------------------------------
+    // glyph vertex positions, just uv coordinates that will be stretched accordingly 
+    // by the glyphs width and height
     float v[] = {0.0, 0.0, 
                  1.0, 0.0, 
                  0.0, 1.0,
                  0.0, 1.0,
                  1.0, 0.0,
                  1.0, 1.0};
-
-    glGenBuffers(1, &font->vbo_glyph_pos_instance);
-    glBindBuffer(GL_ARRAY_BUFFER, font->vbo_glyph_pos_instance);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(v), v, GL_STATIC_DRAW);
     
+    glCreateBuffers(1, &font->vbo_glyph_pos_instance);
+    glNamedBufferData(font->vbo_glyph_pos_instance, sizeof(v), v, GL_STATIC_DRAW);
+    
+    glEnableVertexArrayAttrib(font->vao, 0);
+    glVertexArrayVertexBuffer(font->vao, 0, font->vbo_glyph_pos_instance, 0, 2*sizeof(float));
+    glVertexArrayAttribFormat(font->vao, 0, 2, GL_FLOAT, GL_FALSE, 0);
+    glVertexArrayBindingDivisor(font->vao, 0, 0);
 
-    glGenTextures(1, &font->texture_metadata);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_1D, font->texture_metadata);
+    //-------------------------------------------------------------------------
+    // create 2D texture and upload font bitmap data
+    glCreateTextures(GL_TEXTURE_2D, 1, &font->texture_fontdata);
 
+    glTextureParameteri(font->texture_fontdata, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(font->texture_fontdata, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(font->texture_fontdata, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(font->texture_fontdata, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    glTextureStorage2D(font->texture_fontdata, 1, GL_R8, font->width_padded, font->height);
+    glTextureSubImage2D(font->texture_fontdata, 0, 0, 0, font->width_padded, font->height, GL_RED, GL_UNSIGNED_BYTE, font->font_bitmap);
+
+    //-------------------------------------------------------------------------
+    // create 1D texture and upload font metadata
+    // used for lookup in the bitmap texture
     float *texture_metadata = malloc(sizeof(float)*4*font->num_glyphs);
     
     for (int i = 0; i < font->num_glyphs; i++) {
+        // all the glyphs are in a single line, but in principle we can support multiple lines
         texture_metadata[4*i+0] = font->glyph_offsets[i]/(double)font->width_padded;
         texture_metadata[4*i+1] = 0.0;
         texture_metadata[4*i+2] = font->glyph_widths[i]/(double)font->width_padded;
         texture_metadata[4*i+3] = 1.0;
     }
+    
+    glCreateTextures(GL_TEXTURE_1D, 1, &font->texture_metadata);
 
+    glTextureParameteri(font->texture_metadata, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(font->texture_metadata, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(font->texture_metadata, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 
-    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA32F, font->num_glyphs, 0, GL_RGBA, GL_FLOAT, texture_metadata);
+    glTextureStorage1D(font->texture_metadata, 1, GL_RGBA32F, font->width_padded);
+    glTextureSubImage1D(font->texture_metadata, 0, 0, font->width_padded, GL_RGBA, GL_FLOAT, texture_metadata);
 
     free(texture_metadata);
 }
 
-void font_setup_text(Font_String *font_string)
+/*
+    Creates the vbo used for updating and drawing text. 
+    Initially has a max length of MAX_STRING_LEN, but you're not obliged to use all of it
+*/
+void font_setup_text(Font *font, Font_String *font_string)
 {
-    glGenBuffers(1, &font_string->vbo_code_instances);
-    glBindBuffer(GL_ARRAY_BUFFER, font_string->vbo_code_instances);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float)*4*MAX_STRING_LEN, NULL, GL_DYNAMIC_DRAW);
+    glCreateBuffers(1, &font_string->vbo_code_instances);
+    glNamedBufferData(font_string->vbo_code_instances, 4*3*MAX_STRING_LEN, NULL, GL_DYNAMIC_DRAW);
+    
+    glEnableVertexArrayAttrib(font->vao, 1);
+    glVertexArrayVertexBuffer(font->vao, 1, font_string->vbo_code_instances, 0, 3*sizeof(float));
+    glVertexArrayAttribFormat(font->vao, 1, 3, GL_FLOAT, GL_FALSE, 0);
+    glVertexArrayBindingDivisor(font->vao, 1, 1);
+
+    glUseProgram(program_text);
+    glUniform2f(glGetUniformLocation(program_text, "resolution"), resx, resy);
 }
 
+/*
+    Parses a string (in font_string.str) and creates position and index data sent to 
+    the vertex shader (location 1)
+
+    Supports newlines
+*/
 void font_update_text(Font *font, Font_String *font_string)
 {
+    if (font_string->ctr > MAX_STRING_LEN) {
+        printf("Error: string too long. Returning\n");
+        return;
+    }
+
     static float text_glyph_data[3*MAX_STRING_LEN];
 
     float X = 0.0;
@@ -372,7 +413,7 @@ void font_update_text(Font *font, Font_String *font_string)
             continue;
         }
 
-        int code_base = font_string->str[i]-32;
+        int code_base = font_string->str[i]-32; // first glyph is ' ', i.e. ascii code 32
         float offset = glyph_offsets[code_base];
         float width = glyph_widths[code_base];
 
@@ -382,15 +423,14 @@ void font_update_text(Font *font, Font_String *font_string)
         int ctr1 = 3*ctr;
         text_glyph_data[ctr1++] = x1;
         text_glyph_data[ctr1++] = y1;
-        text_glyph_data[ctr1++] = code_base;;
-
+        text_glyph_data[ctr1++] = code_base;
 
         X += width;
         ctr++;
     }
 
-    glBindBuffer(GL_ARRAY_BUFFER, font_string->vbo_code_instances);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, 4*3*ctr, text_glyph_data);
+    // actual uploading
+    glNamedBufferSubData(font_string->vbo_code_instances, 0, 4*3*ctr, text_glyph_data);
 
     font_string->ctr = ctr;
 }
@@ -398,38 +438,24 @@ void font_update_text(Font *font, Font_String *font_string)
 void font_draw(Font *font, Font_String *font_string, vec2 offset, Color bgColor, Color fgColor, float size) 
 {
     glUseProgram(program_text);
-    glUniform2f(glGetUniformLocation(program_text, "resolution"), resx, resy);
+
     glUniform1f(glGetUniformLocation(program_text, "time"), glfwGetTime());
-    glUniform2f(glGetUniformLocation(program_text, "string_offset"), offset.x, offset.y);
-    glUniform1i(glGetUniformLocation(program_text, "sampler_font"), 0);
-    glUniform1i(glGetUniformLocation(program_text, "sampler_meta"), 1);
-    glUniform3f(glGetUniformLocation(program_text, "bgColor"), bgColor.R, bgColor.G, bgColor.B);
-    glUniform3f(glGetUniformLocation(program_text, "fgColor"), fgColor.R, fgColor.G, fgColor.B);
+    glUniform3fv(glGetUniformLocation(program_text, "bgColor"), 1, &bgColor.R);
+    glUniform3fv(glGetUniformLocation(program_text, "fgColor"), 1, &fgColor.R);
+    glUniform2fv(glGetUniformLocation(program_text, "string_offset"), 1, &offset.x);
     glUniform2f(glGetUniformLocation(program_text, "string_size"), size, size);
 
-    glBindVertexArray(font->vao_ID);
+    glBindVertexArray(font->vao);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, font->texture_fontdata);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_1D, font->texture_metadata);
-
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-
-    glBindBuffer(GL_ARRAY_BUFFER, font->vbo_glyph_pos_instance);
-    glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,(void*)0);
-    glVertexAttribDivisor(0, 0);
-    glBindBuffer(GL_ARRAY_BUFFER, font_string->vbo_code_instances);
-    glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,0,(void*)0);
-    glVertexAttribDivisor(1, 1);
+    glBindTextureUnit(0, font->texture_fontdata);
+    glBindTextureUnit(1, font->texture_metadata);
 
     glDrawArraysInstanced(GL_TRIANGLES, 0, 6, font_string->ctr);
-    
-    glDisableVertexAttribArray(1);
-    glDisableVertexAttribArray(0);
 }
 
+
+/*****************************************************************************/
+// OpenGL and GLFW boilerplate below
 
 void init_GL()
 {
@@ -441,8 +467,8 @@ void init_GL()
         exit(-1);
     }
     glfwWindowHint(GLFW_SAMPLES, 4);    // samples, for antialiasing
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); // shader version should match these
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4); // shader version should match these
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // do not use deprecated functionality
 
     window = glfwCreateWindow(resx, resy, "GLSL template", 0, 0);
@@ -470,9 +496,10 @@ void init_GL()
     glClearColor(40/255.0, 42/255.0, 54/225.0, 1.0f);
 }
 
+
 // Callback function called every time the window size change
-// Adjusts the camera width and heigh so that the scale stays the same
-// Resets projection matrix
+// Adjusts the viewport
+// Resets shader uniform containing resolution
 void windowsize_callback(GLFWwindow* win, int width, int height) {
 
     (void)win;
@@ -481,6 +508,9 @@ void windowsize_callback(GLFWwindow* win, int width, int height) {
     resy = height;
 
     glViewport(0, 0, resx, resy);
+
+    glUseProgram(program_text);
+    glUniform2f(glGetUniformLocation(program_text, "resolution"), resx, resy);
 }
 
 // Callback function called every time a keyboard key is pressed, released or held down
@@ -540,6 +570,7 @@ void mousepos_callback(GLFWwindow* win, double xpos, double ypos) {
 
     }
 }
+
 void mousewheel_callback(GLFWwindow* win, double xoffset, double yoffset) {
     (void)xoffset;
 
@@ -548,6 +579,8 @@ void mousewheel_callback(GLFWwindow* win, double xoffset, double yoffset) {
     glfwGetCursorPos(win, &prevx, &prevy);
 }
 
+
+// Shader loading routines
 char *readFile(const char *filename) {
     // Read content of "filename" and return it as a c-string.
     printf("Reading %s\n", filename);

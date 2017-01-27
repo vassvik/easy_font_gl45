@@ -1,8 +1,8 @@
-#version 330 core
+#version 450 core
 
 in vec2 uv;
 
-uniform sampler2D sampler_font;
+layout(binding = 0) uniform sampler2D sampler_font;
 
 // uniform sampler1D sampler_meta;
 // uniform vec2 resolution;
