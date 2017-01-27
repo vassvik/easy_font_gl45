@@ -26,9 +26,11 @@ void main()
 
     float s = smoothstep(0.4, 0.6, texture(sampler_font, uv2).r);
     
-    color = bgColor*s + fgColor*(1.0 - s);
-
-    // https://www.shadertoy.com/view/ll2GD3
-    vec3 col = pal( color_index/6.0, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67) );
-    color = bgColor*s + col*(1.0 - s);
+    if (color_index < 0.5) {
+    	color = bgColor*s + fgColor*(1.0 - s);
+    } else {
+	    // https://www.shadertoy.com/view/ll2GD3
+	    vec3 col = pal( color_index/5.0, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67) );
+	    color = bgColor*s + col*(1.0 - s);
+    }
 }
