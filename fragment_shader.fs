@@ -5,10 +5,6 @@ in float color_index;
 
 layout(binding = 0) uniform sampler2D sampler_font;
 
-// uniform sampler1D sampler_meta;
-// uniform vec2 resolution;
-// uniform float time;
-
 uniform vec3 bgColor;
 uniform vec3 fgColor;
 
@@ -24,7 +20,7 @@ void main()
     vec2 res_font = textureSize(sampler_font, 0);
     vec2 uv2 = uv - vec2(0.5, 0.5)/res_font; // sample center of texel
 
-    float s = smoothstep(0.4, 0.6, texture(sampler_font, uv2).r);
+    float s =/* test */smoothstep(0.4, 0.6, texture(sampler_font, uv2).r);
     
     if (color_index < 0.5) {
     	color = bgColor*s + fgColor*(1.0 - s);
@@ -34,3 +30,4 @@ void main()
 	    color = bgColor*s + col*(1.0 - s);
     }
 }
+/* test */
