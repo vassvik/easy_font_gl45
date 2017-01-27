@@ -1,7 +1,6 @@
 #version 330 core
 
 in vec2 uv;
-in float invert;
 
 uniform sampler2D sampler_font;
 
@@ -21,6 +20,4 @@ void main()
 
     float s = smoothstep(0.4, 0.6, texture(sampler_font, uv2).r);
     color = bgColor*s + fgColor*(1.0 - s);
-    if (invert > 0.5)
-    	color = 1.0 - color;
 }
