@@ -135,7 +135,7 @@ int main()
     Color fgColor = {248/255.0, 248/255.0, 242/225.0};
     Color bgColor = {68/255.0, 71/255.0, 90/225.0};
 
-    vec2 offset = {-0.995, 0.91};
+    
 
     while ( !glfwWindowShouldClose(window)) { 
         // calculate fps
@@ -146,7 +146,8 @@ int main()
 
         glfwPollEvents();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        
+
+        vec2 offset = {-1.0 + 4.0*1.0/resx, 1.0 - 4.0*12.0/resy};
         sprintf(font_string.str, "fps = %.3f\n", 1.0/avg_dt);
         font_update_text(&font, &font_string);
         font_draw(&font, &font_string, offset, bgColor, fgColor, 2.0);
