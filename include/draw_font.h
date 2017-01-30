@@ -234,6 +234,12 @@ void font_init()
     //-------------------------------------------------------------------------
     // instanced vbo for glyph position ascii value and color index
     // @Incomplete: test_glyph_data is never unmapped
+    
+    // @Bug: Sync issues??
+    // non-DSA works fine without any need for explicit syncing. 
+    // undefine USE_DSA_VBO to see that it works fine without DSA
+#define USE_DSA_VBO
+#ifdef USE_DSA_VBO
     glCreateBuffers(1, &font.vbo_code_instances);
     glNamedBufferStorage(font.vbo_code_instances, 4*4*MAX_STRING_LEN, NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT);
     font.text_glyph_data = glMapNamedBufferRange(font.vbo_code_instances, 0, 4*4*MAX_STRING_LEN, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
@@ -242,6 +248,19 @@ void font_init()
     glVertexArrayVertexBuffer(font.vao, 1, font.vbo_code_instances, 0, 4*sizeof(float));
     glVertexArrayAttribFormat(font.vao, 1, 4, GL_FLOAT, GL_FALSE, 0);
     glVertexArrayBindingDivisor(font.vao, 1, 1);
+#else
+    font.text_glyph_data = malloc(sizeof(float)*4*MAX_STRING_LEN);
+    glGenBuffers(1, &font.vbo_code_instances);
+    glBindBuffer(GL_ARRAY_BUFFER, font.vbo_code_instances);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float)*4*MAX_STRING_LEN, NULL, GL_DYNAMIC_DRAW);
+
+    glEnableVertexAttribArray(1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, font.vbo_code_instances);
+    glVertexAttribPointer(1,4,GL_FLOAT,GL_FALSE,0,(void*)0);
+    glVertexAttribDivisor(1, 1);
+    
+#endif
 
     //-------------------------------------------------------------------------
     // create 2D texture and upload font bitmap data
@@ -326,9 +345,11 @@ void font_draw(char *str, char *col, float offset[2], float size[2], float res[2
         ctr++;
     }
 
+    #ifndef USE_DSA_VBO
     // actual uploading
-    // glBindBuffer(GL_ARRAY_BUFFER, font.vbo_code_instances);
-    // glBufferSubData(GL_ARRAY_BUFFER, 0, 4*4*ctr, font.text_glyph_data);
+    glBindBuffer(GL_ARRAY_BUFFER, font.vbo_code_instances);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, 4*4*ctr, font.text_glyph_data);
+    #endif
     font.ctr = ctr;
 
 
