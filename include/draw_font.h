@@ -74,7 +74,6 @@ float *get_colors(int *num_colors);
 
 #ifdef DRAW_FONT_IMPLEMENTATION
 
-
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #include "stb_image.h"
@@ -96,7 +95,6 @@ float *get_colors(int *num_colors)
     *num_colors = sizeof(colors)/sizeof(float)/3;
     return colors;
 }
-
 
 Font font = {0};
 
@@ -129,9 +127,6 @@ void font_string_dimensions(char *str, int *width, int *height)
 
     *height = Y*font.height;
 }
-
-
-
 
 Font *font_get_font()
 {
@@ -229,7 +224,7 @@ void font_init()
                  1.0, 1.0};
 
     glCreateBuffers(1, &font.vbo_glyph_pos_instance);
-    glNamedBufferStorage(font.vbo_glyph_pos_instance, sizeof(v), v, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT);
+    glNamedBufferStorage(font.vbo_glyph_pos_instance, sizeof(v), v, 0);
     
     glEnableVertexArrayAttrib(font.vao, 0);
     glVertexArrayVertexBuffer(font.vao, 0, font.vbo_glyph_pos_instance, 0, 2*sizeof(float));
@@ -237,7 +232,8 @@ void font_init()
     glVertexArrayBindingDivisor(font.vao, 0, 0);
 
     //-------------------------------------------------------------------------
-    // instanced vbo
+    // instanced vbo for glyph position ascii value and color index
+    // @Incomplete: test_glyph_data is never unmapped
     glCreateBuffers(1, &font.vbo_code_instances);
     glNamedBufferStorage(font.vbo_code_instances, 4*4*MAX_STRING_LEN, NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT);
     font.text_glyph_data = glMapNamedBufferRange(font.vbo_code_instances, 0, 4*4*MAX_STRING_LEN, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
