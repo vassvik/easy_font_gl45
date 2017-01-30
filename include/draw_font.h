@@ -285,13 +285,6 @@ void font_init()
 
     free(texture_metadata);
 
-   
-
-    //-------------------------------------------------------------------------
-    glUseProgram(font.program);
-    glUniform1i(glGetUniformLocation(font.program, "sampler_font"), 0);
-    glUniform1i(glGetUniformLocation(font.program, "sampler_meta"), 1);
-
 }
 
 
@@ -358,11 +351,8 @@ void font_draw(char *str, char *col, float offset[2], float size[2], float res[2
     glUniform2fv(glGetUniformLocation(font.program, "resolution"), 1, res);
 
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, font.texture_fontdata);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_1D, font.texture_metadata);
-
+    glBindTextureUnit(0, font.texture_fontdata);
+    glBindTextureUnit(1, font.texture_metadata);
 
     glBindVertexArray(font.vao);
 

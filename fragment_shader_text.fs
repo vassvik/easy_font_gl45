@@ -3,7 +3,7 @@
 in vec2 uv;
 in float color_index;
 
-uniform sampler2D sampler_font;
+layout(binding = 0) uniform sampler2D sampler_font;
 uniform vec3 colors[9];
 
 out vec3 color;
