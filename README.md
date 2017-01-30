@@ -1,4 +1,8 @@
-# easy_font_gl3
+# easy_font_gl45
 
-Simple texture renderer in Opengl 3.3 using the font used by stb_easy_font.h. Uses instanced rendering, so that only position and dimensions of each glyph have to be updated isntead of each vertex. 
+Simple font renderer in Opengl 4.5 using the font used by stb_easy_font.h. Uses instanced rendering, so that only position and dimensions of each glyph have to be updated isntead of each vertex. Uses DSA. 
 
+
+compiles with
+
+gcc main.c -Iinclude -lglfw3
