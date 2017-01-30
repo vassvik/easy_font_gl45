@@ -321,7 +321,7 @@ int main()
         font_draw(str1, NULL, offset1, scale, res);
         font_draw(str2, NULL, offset2, scale, res);
         font_draw(str3, NULL, offset3, scale, res);
-
+        
         glfwSwapBuffers(window);
     }
 

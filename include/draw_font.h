@@ -54,7 +54,7 @@ typedef struct Font {
 
     GLuint vbo_code_instances;  // vec3: (char_pos_x, char_pos_y, char_index)
     
-    float text_glyph_data[4*MAX_STRING_LEN];
+    float *text_glyph_data;
     
     int ctr;                    // the number of glyphs to draw (i.e. the length of the string minus newlines)
 } Font;
@@ -218,7 +218,6 @@ void font_init()
     glGenVertexArrays(1, &font.vao);
     glBindVertexArray(font.vao);
 
-
     //-------------------------------------------------------------------------
     // glyph vertex positions, just uv coordinates that will be stretched accordingly 
     // by the glyphs width and height
@@ -229,27 +228,24 @@ void font_init()
                  1.0, 0.0,
                  1.0, 1.0};
 
-    glGenBuffers(1, &font.vbo_glyph_pos_instance);
-    glBindBuffer(GL_ARRAY_BUFFER, font.vbo_glyph_pos_instance);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(v), v, GL_STATIC_DRAW);
+    glCreateBuffers(1, &font.vbo_glyph_pos_instance);
+    glNamedBufferStorage(font.vbo_glyph_pos_instance, sizeof(v), v, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT);
     
-    glEnableVertexAttribArray(0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, font.vbo_glyph_pos_instance);
-    glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,(void*)0);
-    glVertexAttribDivisor(0, 0);
+    glEnableVertexArrayAttrib(font.vao, 0);
+    glVertexArrayVertexBuffer(font.vao, 0, font.vbo_glyph_pos_instance, 0, 2*sizeof(float));
+    glVertexArrayAttribFormat(font.vao, 0, 2, GL_FLOAT, GL_FALSE, 0);
+    glVertexArrayBindingDivisor(font.vao, 0, 0);
 
     //-------------------------------------------------------------------------
     // instanced vbo
-    glGenBuffers(1, &font.vbo_code_instances);
-    glBindBuffer(GL_ARRAY_BUFFER, font.vbo_code_instances);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float)*4*MAX_STRING_LEN, NULL, GL_DYNAMIC_DRAW);
-
-    glEnableVertexAttribArray(1);
-
-    glBindBuffer(GL_ARRAY_BUFFER, font.vbo_code_instances);
-    glVertexAttribPointer(1,4,GL_FLOAT,GL_FALSE,0,(void*)0);
-    glVertexAttribDivisor(1, 1);
+    glCreateBuffers(1, &font.vbo_code_instances);
+    glNamedBufferStorage(font.vbo_code_instances, 4*4*MAX_STRING_LEN, NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT);
+    font.text_glyph_data = glMapNamedBufferRange(font.vbo_code_instances, 0, 4*4*MAX_STRING_LEN, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+    
+    glEnableVertexArrayAttrib(font.vao, 1);
+    glVertexArrayVertexBuffer(font.vao, 1, font.vbo_code_instances, 0, 4*sizeof(float));
+    glVertexArrayAttribFormat(font.vao, 1, 4, GL_FLOAT, GL_FALSE, 0);
+    glVertexArrayBindingDivisor(font.vao, 1, 1);
 
     //-------------------------------------------------------------------------
     // create 2D texture and upload font bitmap data
@@ -277,7 +273,6 @@ void font_init()
     glCreateTextures(GL_TEXTURE_1D, 1, &font.texture_metadata);
     glTextureParameteri(font.texture_metadata, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTextureParameteri(font.texture_metadata, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTextureParameteri(font.texture_metadata, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureStorage1D(font.texture_metadata, 1, GL_RGBA32F, font.width_padded);
     glTextureSubImage1D(font.texture_metadata, 0, 0, font.width_padded, GL_RGBA, GL_FLOAT, texture_metadata);
 
@@ -336,9 +331,10 @@ void font_draw(char *str, char *col, float offset[2], float size[2], float res[2
     }
 
     // actual uploading
-    glBindBuffer(GL_ARRAY_BUFFER, font.vbo_code_instances);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, 4*4*ctr, font.text_glyph_data);
+    // glBindBuffer(GL_ARRAY_BUFFER, font.vbo_code_instances);
+    // glBufferSubData(GL_ARRAY_BUFFER, 0, 4*4*ctr, font.text_glyph_data);
     font.ctr = ctr;
+
 
 
     glUseProgram(font.program);
@@ -355,6 +351,7 @@ void font_draw(char *str, char *col, float offset[2], float size[2], float res[2
     glBindVertexArray(font.vao);
 
     glDrawArraysInstanced(GL_TRIANGLES, 0, 6, font.ctr);
+    //glFinish();
 }
 
 char *readFile2(const char *filename) {
