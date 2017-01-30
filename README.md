@@ -7,6 +7,8 @@ compiles with
 
 gcc main.c -Iinclude -lglfw3
 
+### Screenshot
 ![screenshot](screenshot.png)
+
+### Illustration
 ![drawing](drawing.png)
-![font](vass_font.png)
