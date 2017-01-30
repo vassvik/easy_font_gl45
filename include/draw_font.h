@@ -253,14 +253,13 @@ void font_init()
 
     //-------------------------------------------------------------------------
     // create 2D texture and upload font bitmap data
-    glGenTextures(1, &font.texture_fontdata);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, font.texture_fontdata);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, font.width_padded, font.height, 0, GL_RED, GL_UNSIGNED_BYTE, font_bitmap);
+    glCreateTextures(GL_TEXTURE_2D, 1, &font.texture_fontdata);
+    glTextureParameteri(font.texture_fontdata, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(font.texture_fontdata, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(font.texture_fontdata, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(font.texture_fontdata, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTextureStorage2D(font.texture_fontdata, 1, GL_R8, font->width_padded, font->height);
+    glTextureSubImage2D(font.texture_fontdata, 0, 0, 0, font->width_padded, font->height, GL_RED, GL_UNSIGNED_BYTE, font->font_bitmap);
 
     //-------------------------------------------------------------------------
     // create 1D texture and upload font metadata
@@ -275,13 +274,12 @@ void font_init()
         texture_metadata[4*i+3] = 1.0;
     }
 
-    glGenTextures(1, &font.texture_metadata);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_1D, font.texture_metadata);
-    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA32F, NUM_GLYPHS, 0, GL_RGBA, GL_FLOAT, texture_metadata);
+    glCreateTextures(GL_TEXTURE_1D, 1, &font.texture_fontdata);
+    glTextureParameteri(font.texture_fontdata, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(font.texture_fontdata, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(font.texture_fontdata, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureStorage1D(font.texture_fontdata, 1, GL_RGBA32F, font->width_padded);
+    glTextureSubImage1D(font.texture_fontdata, 0, 0, font->width_padded, GL_RGBA, GL_FLOAT, texture_metadata);
 
     free(texture_metadata);
 
