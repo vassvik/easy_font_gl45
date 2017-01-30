@@ -218,18 +218,6 @@ void font_init()
     glGenVertexArrays(1, &font.vao);
     glBindVertexArray(font.vao);
 
-    //-------------------------------------------------------------------------
-    // create 2D texture and upload font bitmap data
-    glGenTextures(1, &font.texture_fontdata);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, font.texture_fontdata);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, font.width_padded, font.height, 0, GL_RED, GL_UNSIGNED_BYTE, font_bitmap);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-
 
     //-------------------------------------------------------------------------
     // glyph vertex positions, just uv coordinates that will be stretched accordingly 
@@ -250,6 +238,29 @@ void font_init()
     glBindBuffer(GL_ARRAY_BUFFER, font.vbo_glyph_pos_instance);
     glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,(void*)0);
     glVertexAttribDivisor(0, 0);
+
+    //-------------------------------------------------------------------------
+    // instanced vbo
+    glGenBuffers(1, &font.vbo_code_instances);
+    glBindBuffer(GL_ARRAY_BUFFER, font.vbo_code_instances);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float)*4*MAX_STRING_LEN, NULL, GL_DYNAMIC_DRAW);
+
+    glEnableVertexAttribArray(1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, font.vbo_code_instances);
+    glVertexAttribPointer(1,4,GL_FLOAT,GL_FALSE,0,(void*)0);
+    glVertexAttribDivisor(1, 1);
+
+    //-------------------------------------------------------------------------
+    // create 2D texture and upload font bitmap data
+    glGenTextures(1, &font.texture_fontdata);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, font.texture_fontdata);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, font.width_padded, font.height, 0, GL_RED, GL_UNSIGNED_BYTE, font_bitmap);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
     //-------------------------------------------------------------------------
     // create 1D texture and upload font metadata
@@ -275,16 +286,7 @@ void font_init()
 
     free(texture_metadata);
 
-    //-------------------------------------------------------------------------
-    glGenBuffers(1, &font.vbo_code_instances);
-    glBindBuffer(GL_ARRAY_BUFFER, font.vbo_code_instances);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float)*4*MAX_STRING_LEN, NULL, GL_DYNAMIC_DRAW);
-
-    glEnableVertexAttribArray(1);
-
-    glBindBuffer(GL_ARRAY_BUFFER, font.vbo_code_instances);
-    glVertexAttribPointer(1,4,GL_FLOAT,GL_FALSE,0,(void*)0);
-    glVertexAttribDivisor(1, 1);
+   
 
     //-------------------------------------------------------------------------
     glUseProgram(font.program);
