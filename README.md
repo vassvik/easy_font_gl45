@@ -6,3 +6,7 @@ Simple font renderer in Opengl 4.5 using the font used by stb_easy_font.h. Uses 
 compiles with
 
 gcc main.c -Iinclude -lglfw3
+
+![screenshot](screenshot.png)
+![drawing](drawing.png)
+![font](vass_font.png)
