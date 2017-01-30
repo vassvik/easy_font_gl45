@@ -345,8 +345,8 @@ void init_GL()
         exit(-1);
     }
     glfwWindowHint(GLFW_SAMPLES, 4);    // samples, for antialiasing
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); // shader version should match these
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4); // shader version should match these
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // do not use deprecated functionality
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
