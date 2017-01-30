@@ -1,4 +1,4 @@
-#version 450 core
+#version 330 core
 
 layout(location = 0) in vec2 vertexPosition;
 layout(location = 1) in vec4 instanceGlyph;
@@ -6,8 +6,8 @@ layout(location = 1) in vec4 instanceGlyph;
 uniform vec2 string_offset;
 uniform vec2 string_size;
 
-layout(binding = 0) uniform sampler2D sampler_font;
-layout(binding = 1) uniform sampler1D sampler_meta;
+uniform sampler2D sampler_font;
+uniform sampler1D sampler_meta;
 
 uniform vec2 resolution;
 
@@ -16,7 +16,7 @@ out float color_index;
 
 void main(){
     float res_meta = textureSize(sampler_meta, 0);
-    vec2  res_font = textureSize(sampler_font, 0);
+    vec2 res_font = textureSize(sampler_font, 0);
 
     vec4 q = texture(sampler_meta, (instanceGlyph.z + 0.5)/res_meta);
 
@@ -26,7 +26,6 @@ void main(){
     /*
     float ratio  = resolution.x/resolution.y;
     float ratio2 = (res_glyph.x*res_font.x)/(res_glyph.y*res_font.y);
-    
     vec2 p = vertexPosition;           // modelspace
     p *= vec2(ratio2, 1.0)*res_font.y; // to texture space, each glyph is res_font.y tall and proportionally wide
     p += instanceGlyph.xy;             // displace each glyph so that it is in the right place in texture space
