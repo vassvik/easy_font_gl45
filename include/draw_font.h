@@ -8,7 +8,6 @@ extern "C" {
 char *readFile2(const char *filename);
 GLuint LoadShaders2(const char * vertex_file_path,const char * fragment_file_path);
 
-
 #define MAX_STRING_LEN 40000
 #define NUM_GLYPHS 96
 /*
@@ -178,7 +177,6 @@ void font_init()
     }
     font.glyph_widths[num-1] = width;
 
-
     // convert the RGB texture into a 1-byte texture, strip the first line (containing width info)
     // add padding, so that texture width is a multiple of 4 (for opengl packing compliance)
     // y-axis is flipped (since input image is in image space, i.e. +Y is downwards)
@@ -207,7 +205,6 @@ void font_init()
     }
 
     free(data); 
-
 
     //-------------------------------------------------------------------------
     glGenVertexArrays(1, &font.vao);
@@ -255,11 +252,9 @@ void font_init()
     glBufferData(GL_ARRAY_BUFFER, sizeof(float)*4*MAX_STRING_LEN, NULL, GL_DYNAMIC_DRAW);
 
     glEnableVertexAttribArray(1);
-
     glBindBuffer(GL_ARRAY_BUFFER, font.vbo_code_instances);
     glVertexAttribPointer(1,4,GL_FLOAT,GL_FALSE,0,(void*)0);
     glVertexAttribDivisor(1, 1);
-    
 #endif
 
     //-------------------------------------------------------------------------
@@ -292,7 +287,6 @@ void font_init()
     glTextureSubImage1D(font.texture_metadata, 0, 0, font.width_padded, GL_RGBA, GL_FLOAT, texture_metadata);
 
     free(texture_metadata);
-
 }
 
 
@@ -303,6 +297,7 @@ void font_draw(char *str, char *col, float offset[2], float size[2], float res[2
         font_init();
     }
 
+    // Update/Upload
     if (font.ctr > MAX_STRING_LEN) {
         printf("Error: string too long. Returning\n");
         return;
@@ -352,8 +347,7 @@ void font_draw(char *str, char *col, float offset[2], float size[2], float res[2
     #endif
     font.ctr = ctr;
 
-
-
+    // Drawing
     glUseProgram(font.program);
     glUniform1f(glGetUniformLocation(font.program, "time"), glfwGetTime());
     glUniform3fv(glGetUniformLocation(font.program, "colors"), 9, colors);
