@@ -235,7 +235,7 @@ void font_init()
     // @Bug: Sync issues??
     // non-DSA works fine without any need for explicit syncing. 
     // undefine USE_DSA_VBO to see that it works fine without DSA
-//#define USE_DSA_VBO
+#define USE_DSA_VBO
 #ifdef USE_DSA_VBO
     glCreateBuffers(1, &font.vbo_code_instances);
     glNamedBufferStorage(font.vbo_code_instances, 4*4*MAX_STRING_LEN, NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT);
