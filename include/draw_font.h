@@ -256,19 +256,15 @@ void font_init()
     glGenTextures(1, &font.texture_fontdata);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, font.texture_fontdata);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, font.width_padded, font.height, 0, GL_RED, GL_UNSIGNED_BYTE, font_bitmap);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, font.width_padded, font.height, 0, GL_RED, GL_UNSIGNED_BYTE, font_bitmap);
 
     //-------------------------------------------------------------------------
     // create 1D texture and upload font metadata
     // used for lookup in the bitmap texture    
-    glGenTextures(1, &font.texture_metadata);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_1D, font.texture_metadata);
-
     float *texture_metadata = (float*)malloc(sizeof(float)*4*NUM_GLYPHS);
     
     for (int i = 0; i < NUM_GLYPHS; i++) {
@@ -279,6 +275,9 @@ void font_init()
         texture_metadata[4*i+3] = 1.0;
     }
 
+    glGenTextures(1, &font.texture_metadata);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_1D, font.texture_metadata);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
