@@ -258,8 +258,8 @@ void font_init()
     glTextureParameteri(font.texture_fontdata, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(font.texture_fontdata, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(font.texture_fontdata, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTextureStorage2D(font.texture_fontdata, 1, GL_R8, font->width_padded, font->height);
-    glTextureSubImage2D(font.texture_fontdata, 0, 0, 0, font->width_padded, font->height, GL_RED, GL_UNSIGNED_BYTE, font->font_bitmap);
+    glTextureStorage2D(font.texture_fontdata, 1, GL_R8, font.width_padded, font.height);
+    glTextureSubImage2D(font.texture_fontdata, 0, 0, 0, font.width_padded, font.height, GL_RED, GL_UNSIGNED_BYTE, font_bitmap);
 
     //-------------------------------------------------------------------------
     // create 1D texture and upload font metadata
@@ -274,12 +274,12 @@ void font_init()
         texture_metadata[4*i+3] = 1.0;
     }
 
-    glCreateTextures(GL_TEXTURE_1D, 1, &font.texture_fontdata);
-    glTextureParameteri(font.texture_fontdata, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTextureParameteri(font.texture_fontdata, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTextureParameteri(font.texture_fontdata, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTextureStorage1D(font.texture_fontdata, 1, GL_RGBA32F, font->width_padded);
-    glTextureSubImage1D(font.texture_fontdata, 0, 0, font->width_padded, GL_RGBA, GL_FLOAT, texture_metadata);
+    glCreateTextures(GL_TEXTURE_1D, 1, &font.texture_metadata);
+    glTextureParameteri(font.texture_metadata, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(font.texture_metadata, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(font.texture_metadata, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureStorage1D(font.texture_metadata, 1, GL_RGBA32F, font.width_padded);
+    glTextureSubImage1D(font.texture_metadata, 0, 0, font.width_padded, GL_RGBA, GL_FLOAT, texture_metadata);
 
     free(texture_metadata);
 
