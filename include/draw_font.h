@@ -349,8 +349,8 @@ void font_draw(char *str, char *col, float offset[2], float size[2], float res[2
     glUniform2fv(glGetUniformLocation(font.program, "resolution"), 1, res);
 
 
-    //glBindTextureUnit(0, font.texture_fontdata);
-    //glBindTextureUnit(1, font.texture_metadata);
+    glBindTextureUnit(0, font.texture_fontdata);
+    glBindTextureUnit(1, font.texture_metadata);
 
     glBindVertexArray(font.vao);
 
